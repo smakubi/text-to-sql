@@ -14,8 +14,10 @@ from sqlalchemy import create_engine, exc, text
 import pymysql
 import time
 
+
 OPENAI_API_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
 st.set_page_config(page_title="SQL and Python Agent")
+
 
 # 1. Initialize session state here.
 if "db_config" not in st.session_state:
@@ -33,6 +35,7 @@ if "db_connected" not in st.session_state:
 if 'databases' not in st.session_state:
     st.session_state.databases = []
 
+
 # 2. Sidebar user inputs.
 st.sidebar.title("DATABASE CONFIGURATION")
 st.sidebar.subheader("Enter MySQL connection details:", divider=True)
@@ -41,6 +44,7 @@ user = st.sidebar.text_input("User", value=st.session_state.db_config['USER'])
 password = st.sidebar.text_input("Password", type="password", value=st.session_state.db_config['PASSWORD'])
 host = st.sidebar.text_input("Host", value=st.session_state.db_config['HOST'])
 port = st.sidebar.text_input("Port", value=st.session_state.db_config['PORT'])
+
 
 # 3. Single dynamic button label.
 button_label = "Save and Connect" if not st.session_state.db_connected else "Update Connection"
@@ -80,6 +84,7 @@ def test_connection(config):
         return False, []
     return False, []
 
+
 # 4. Single button to connect/update.
 if st.sidebar.button(button_label):
     if all([user, password, host, port]):
@@ -104,6 +109,7 @@ if st.sidebar.button(button_label):
     else:
         st.sidebar.error("All fields are required")
 
+
 # 5. If connected, show the databases in a dropdown for selection.
 if st.session_state.db_connected and st.session_state.databases:
     db_choice = st.sidebar.selectbox(
@@ -123,6 +129,7 @@ if st.session_state.db_connected and st.session_state.databases:
         except Exception as e:
             st.session_state.db_config['DATABASE'] = ''
             st.sidebar.error(f"Connection to {db_choice} failed: {str(e)}")
+
 
 # Main page
 st.title("SQL and Python Agent")
@@ -220,11 +227,13 @@ if 'messages' not in st.session_state:
 if 'db_config' in st.session_state:
     if 'agent_memory_sql' not in st.session_state:
         st.session_state.agent_memory_sql = initialize_sql_agent(st.session_state.db_config)
+
     if 'agent_memory_python' not in st.session_state:
         st.session_state.agent_memory_python = initialize_python_agent()
     
     if 'sql_agent' not in st.session_state:
         st.session_state.sql_agent = st.session_state.agent_memory_sql
+        
     if 'python_agent' not in st.session_state:
         st.session_state.python_agent = st.session_state.agent_memory_python
 else:
@@ -277,7 +286,7 @@ def generate_response(code_type, input_text):
             print(f"Error generating response: {str(e)}")
             return "Failed to generate visualization"
             
-    else:  # SQL query
+    else:  # SQL code
         try:
             return st.session_state.sql_agent.run(local_prompt)
         except Exception as e:
