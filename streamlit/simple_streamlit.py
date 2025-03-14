@@ -44,8 +44,8 @@ host = st.sidebar.text_input("Host", value=st.session_state.db_config['HOST'])
 port = st.sidebar.text_input("Port", value=st.session_state.db_config['PORT'])
 
 
-# # 3. Single dynamic button label.
-# button_label = "Save and Connect" if not st.session_state.db_connected else "Update Connection"
+# 3. Single dynamic button label.
+button_label = "Save and Connect" if not st.session_state.db_connected else "Update Connection"
 
 
 # def test_connection(config):
