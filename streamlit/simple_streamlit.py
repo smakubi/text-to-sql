@@ -48,42 +48,42 @@ port = st.sidebar.text_input("Port", value=st.session_state.db_config['PORT'])
 button_label = "Save and Connect" if not st.session_state.db_connected else "Update Connection"
 
 
-# def test_connection(config):
-#     """Check DB connectivity and, if successful, fetch all databases."""
-#     try:
-#         connection_string = (
-#             f"mysql+pymysql://{config['USER']}:{urllib.parse.quote_plus(config['PASSWORD'])}"
-#             f"@{config['HOST']}:{config['PORT']}/"
-#         )
-#         engine = create_engine(connection_string)
-#         with engine.connect() as conn:
-#             conn.execute(text("SELECT 1"))
+def test_connection(config):
+    """Check DB connectivity and, if successful, fetch all databases."""
+    try:
+        connection_string = (
+            f"mysql+pymysql://{config['USER']}:{urllib.parse.quote_plus(config['PASSWORD'])}"
+            f"@{config['HOST']}:{config['PORT']}/"
+        )
+        engine = create_engine(connection_string)
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
 
-#         # If we succeed, fetch list of databases for the dropdown
-#         try:
-#             connection = mysql.connector.connect(
-#                 host=config['HOST'],
-#                 user=config['USER'],
-#                 password=config['PASSWORD'],
-#                 port=config['PORT']
-#             )
-#             if connection.is_connected():
-#                 cursor = connection.cursor()
-#                 cursor.execute("SHOW DATABASES")
-#                 dbs = [db[0] for db in cursor.fetchall() 
-#                        if db[0] not in ('sys', 'mysql','performance_schema','information_schema')]
-#                 cursor.close()
-#                 connection.close()
-#                 return True, dbs
-#         except Error as e:
-#             st.sidebar.error(f"Error fetching databases: {e}")
-#             return False, []
-#     except Exception as e:
-#         st.sidebar.error(f"Connection test failed: {str(e)}")
-#         return False, []
-#     return False, []
-# # CHAT INPUT
+        # If we succeed, fetch list of databases for the dropdown
+        try:
+            connection = mysql.connector.connect(
+                host=config['HOST'],
+                user=config['USER'],
+                password=config['PASSWORD'],
+                port=config['PORT']
+            )
+            if connection.is_connected():
+                cursor = connection.cursor()
+                cursor.execute("SHOW DATABASES")
+                dbs = [db[0] for db in cursor.fetchall() 
+                       if db[0] not in ('sys', 'mysql','performance_schema','information_schema')]
+                cursor.close()
+                connection.close()
+                return True, dbs
+        except Error as e:
+            st.sidebar.error(f"Error fetching databases: {e}")
+            return False, []
+    except Exception as e:
+        st.sidebar.error(f"Connection test failed: {str(e)}")
+        return False, []
+    return False, []
+# CHAT INPUT
 
-# if prompt := st.chat_input("Please ask your question:"):
-#    with st.chat_message("user", avatar="🚀"):
-#      st.markdown(prompt)
+if prompt := st.chat_input("Please ask your question:"):
+   with st.chat_message("user", avatar="🚀"):
+     st.markdown(prompt)
