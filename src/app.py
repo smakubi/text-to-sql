@@ -14,9 +14,102 @@ from constants import LLM_MODEL_NAME
 from sqlalchemy import create_engine, exc, text
 import pymysql
 import time
+import certifi  # Cross-platform SSL certificate authority bundle
 
 OPENAI_API_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
-st.set_page_config(page_title="SQL and Python Agent")
+st.set_page_config(page_title="SQL and Python Agent", layout="wide")
+
+def inject_custom_css():
+    st.markdown("""
+    <style>
+        /* Import Google Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        html, body, [class*="css"] {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Gradient Title */
+        h1 {
+            background: linear-gradient(to right, #4F46E5, #06B6D4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            padding-bottom: 10px;
+        }
+        
+        /* Card-like styling for chat messages */
+        .stChatMessage {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+        
+        .stChatMessage:hover {
+            transform: scale(1.005);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background-color: #0F172A;
+            border-right: 1px solid #1E293B;
+        }
+        
+        /* Custom Button */
+        div.stButton > button {
+            background: linear-gradient(to right, #4F46E5, #06B6D4);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        div.stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
+        }
+        
+        /* Input fields */
+        .stTextInput input {
+            border-radius: 8px;
+            border: 1px solid #334155;
+            background-color: #1E293B;
+            color: white;
+        }
+        
+        .stTextInput input:focus {
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+        
+        /* Success/Error messages */
+        .stAlert {
+            border-radius: 10px;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+inject_custom_css()
+
+def reset_conversation():
+    st.session_state.messages = []
+    if 'db_config' in st.session_state:
+        try:
+            st.session_state.agent_memory_sql = initialize_sql_agent(st.session_state.db_config)
+            st.session_state.agent_memory_python = initialize_python_agent()
+            st.session_state.sql_agent = st.session_state.agent_memory_sql
+            st.session_state.python_agent = st.session_state.agent_memory_python
+        except:
+            pass # Handle case where config is invalid
+    else:
+        st.warning("Please configure database credentials first")
 
 # 1. Initialize session state.
 if "db_config" not in st.session_state:
@@ -35,16 +128,17 @@ if 'databases' not in st.session_state:
     st.session_state.databases = []
 
 # 2. Sidebar user inputs.
-st.sidebar.title("DATABASE CONFIGURATION")
-st.sidebar.subheader("Enter MySQL connection details:", divider=True)
+st.sidebar.title("🔌 Connect Database")
+st.sidebar.markdown("Configure your **MySQL** connection below to start analyzing data.")
+st.sidebar.subheader("Connection Details", divider="rainbow")
 
-user = st.sidebar.text_input("User", value=st.session_state.db_config['USER'])
-password = st.sidebar.text_input("Password", type="password", value=st.session_state.db_config['PASSWORD'])
-host = st.sidebar.text_input("Host", value=st.session_state.db_config['HOST'])
-port = st.sidebar.text_input("Port", value=st.session_state.db_config['PORT'])
+user = st.sidebar.text_input("User", value=st.session_state.db_config['USER'], placeholder="root")
+password = st.sidebar.text_input("Password", type="password", value=st.session_state.db_config['PASSWORD'], placeholder="********")
+host = st.sidebar.text_input("Host", value=st.session_state.db_config['HOST'], placeholder="localhost")
+port = st.sidebar.text_input("Port", value=st.session_state.db_config['PORT'], placeholder="3306")
 
 # 3. Single dynamic button label.
-button_label = "Save and Connect" if not st.session_state.db_connected else "Update Connection"
+button_label = "🚀 Connect & Save" if not st.session_state.db_connected else "🔄 Update Connection"
 
 def test_connection(config):
     """Check DB connectivity and, if successful, fetch all databases."""
@@ -52,6 +146,7 @@ def test_connection(config):
         connection_string = (
             f"mysql+pymysql://{config['USER']}:{urllib.parse.quote_plus(config['PASSWORD'])}"
             f"@{config['HOST']}:{config['PORT']}/"
+            f"?ssl_ca={certifi.where()}&ssl_verify_cert=true&ssl_verify_identity=true"
         )
         engine = create_engine(connection_string)
         with engine.connect() as conn:
@@ -63,13 +158,16 @@ def test_connection(config):
                 host=config['HOST'],
                 user=config['USER'],
                 password=config['PASSWORD'],
-                port=config['PORT']
+                port=config['PORT'],
+                ssl_ca=certifi.where(),  # Works on Mac, Linux, Windows
+                ssl_verify_cert=True,
+                ssl_verify_identity=True
             )
             if connection.is_connected():
                 cursor = connection.cursor()
                 cursor.execute("SHOW DATABASES")
                 dbs = [db[0] for db in cursor.fetchall() 
-                       if db[0] not in ('sys', 'mysql','performance_schema','information_schema')]
+                       if db[0] not in ('sys', 'mysql','performance_schema','information_schema', 'METRICS_SCHEMA')]
                 cursor.close()
                 connection.close()
                 return True, dbs
@@ -92,23 +190,25 @@ if st.sidebar.button(button_label):
             # DATABASE will be selected from dropdown below, so leave it blank initially
             'DATABASE': ''
         }
-        ok, db_list = test_connection(new_config)
+        with st.spinner("Testing connection..."):
+            ok, db_list = test_connection(new_config)
         if ok:
             st.session_state.db_config = new_config
             st.session_state.db_connected = True
             # Store database list in session for the dropdown
             st.session_state.databases = db_list
-            st.sidebar.success("Connection test successful! Please select a database.")
+            st.sidebar.success("✅ Connected successfully!")
         else:
             st.session_state.db_connected = False
             st.session_state.databases = []
     else:
-        st.sidebar.error("All fields are required")
+        st.sidebar.error("⚠️ All fields are required")
 
 # 5. If connected, show the databases in a dropdown for selection.
 if st.session_state.db_connected and st.session_state.databases:
+    st.sidebar.markdown("---")
     db_choice = st.sidebar.selectbox(
-        "Select Database",
+        "📂 Select Database",
         options=st.session_state.databases,
         index=st.session_state.databases.index(st.session_state.db_config['DATABASE'])
         if st.session_state.db_config['DATABASE'] in st.session_state.databases else 0
@@ -120,14 +220,28 @@ if st.session_state.db_connected and st.session_state.databases:
         try:
             st.session_state.sql_agent = initialize_sql_agent(st.session_state.db_config)
             st.session_state.python_agent = initialize_python_agent()
-            st.sidebar.success(f"Connected to {db_choice}!")
+            st.sidebar.success(f"Active Database: {db_choice}")
         except Exception as e:
             st.session_state.db_config['DATABASE'] = ''
             st.sidebar.error(f"Connection to {db_choice} failed: {str(e)}")
 
+    # Add Reset Button to Sidebar
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🗑️ Reset Conversation"):
+        reset_conversation()
+        st.rerun()
+
 # Main page
-st.title("SQL and Python Agent")
-st.write("This agent can help you with SQL queries and Python code for data analysis. Configure your MySQL database connection using the sidebar.")
+st.title("SQL & Python AI Agent 🤖")
+st.markdown("""
+    <div style='background-color: rgba(79, 70, 229, 0.1); padding: 20px; border-radius: 10px; border-left: 5px solid #4F46E5; margin-bottom: 20px;'>
+        <p style='font-size: 1.1rem; margin: 0;'>
+            <strong>Welcome!</strong> This intelligent agent transforms your natural language questions into 
+            <strong>SQL queries</strong> and <strong>Python visualizations</strong>. 
+            Connect your database in the sidebar to get started.
+        </p>
+    </div>
+""", unsafe_allow_html=True)
 
 if st.session_state.db_connected and st.session_state.db_config['DATABASE']:
     st.write(
@@ -154,6 +268,7 @@ def create_db_connection(config):
         connection_string = (
             f"mysql+pymysql://{config['USER']}:{config['PASSWORD']}@"
             f"{config['HOST']}:{config['PORT']}/{config['DATABASE']}"
+            f"?ssl_ca={certifi.where()}&ssl_verify_cert=true&ssl_verify_identity=true"
         )
         engine = create_engine(connection_string, pool_pre_ping=True)
         db = SQLDatabase.from_uri(connection_string)
@@ -286,19 +401,7 @@ def generate_response(code_type, input_text):
             return """Failed to execute SQL query. Ensure you have enough OpenAI API credits. This is most likely to be the issue."""
 
 
-def reset_conversation():
-    st.session_state.messages = []
-    if 'db_config' in st.session_state:
-        st.session_state.agent_memory_sql = initialize_sql_agent(st.session_state.db_config)
-        st.session_state.agent_memory_python = initialize_python_agent()
-        st.session_state.sql_agent = st.session_state.agent_memory_sql
-        st.session_state.python_agent = st.session_state.agent_memory_python
-    else:
-        st.warning("Please configure database credentials first")
 
-col1, col2 = st.columns([3, 1])
-with col2:
-    st.button("Reset Chat", on_click=reset_conversation)
 
 # Display chat messages from history
 for message in st.session_state.messages:

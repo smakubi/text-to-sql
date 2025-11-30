@@ -1,11 +1,12 @@
 import urllib.parse
+import certifi
 from langchain import hub
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain.agents import create_sql_agent
 from langchain.agents.agent_types import AgentType
 from langchain.memory import ConversationBufferMemory 
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
-from langchain_community.chat_message_histories import SQLChatMessageHistory 
+ 
 from langchain_community.utilities import SQLDatabase
 from langchain_experimental.tools import PythonREPLTool
 from langchain.chat_models import ChatOpenAI
@@ -143,6 +144,7 @@ def initialize_sql_agent(db_config):
         connection_string = (
             f"mysql+pymysql://{db_config['USER']}:{password}@"
             f"{db_config['HOST']}:{db_config['PORT']}/{db_config['DATABASE']}"
+            f"?ssl_ca={certifi.where()}&ssl_verify_cert=true&ssl_verify_identity=true"
         )
         
         db = SQLDatabase.from_uri(connection_string)
@@ -153,14 +155,9 @@ def initialize_sql_agent(db_config):
             llm=llm
         )
         
-        message_history = SQLChatMessageHistory(
-            session_id="my-session",
-            connection_string = (
-            f"mysql+pymysql://{db_config['USER']}:{password}@"
-            f"{db_config['HOST']}:{db_config['PORT']}/{db_config['DATABASE']}"), #added recently
-            table_name="message_store",
-            session_id_field_name="session_id"
-        )
+        # Use in-memory history instead of SQL-backed history to avoid permission issues
+        from langchain.memory import ChatMessageHistory
+        message_history = ChatMessageHistory()
         memory = ConversationBufferMemory(memory_key="chat_history", input_key='input', chat_memory=message_history, return_messages=False) #added recently
 
         # Create and return agent
