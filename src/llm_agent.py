@@ -13,22 +13,11 @@ from langchain.chat_models import ChatOpenAI
 from constants import LLM_MODEL_NAME
 import streamlit as st
 
-CUSTOM_SUFFIX = """Begin!
-
-Relevant pieces of previous conversation:
-{chat_history}
-(Note: Only reference this information if it is relevant to the current query.)
-
-Question: {input}
-Thought Process: It is imperative that I do not fabricate information not present in any table or engage in hallucination; maintaining trustworthiness is crucial.
+SQL_SYSTEM_INSTRUCTIONS = """It is imperative that I do not fabricate information not present in any table or engage in hallucination; maintaining trustworthiness is crucial.
 In SQL queries involving string or TEXT comparisons like first_name, I must use the `LOWER()` function for case-insensitive comparisons and the `LIKE` operator for fuzzy matching. 
 Queries for return percentage is defined as total number of returns divided by total number of orders. You can join orders table with users table to know more about each user.
 Make sure that query is related to the SQL database and tables you are working with.
 If the result is empty, the Answer should be "No results found". DO NOT hallucinate an answer if there is no result.
-
-My final response should STRICTLY be the output of SQL query.
-
-{agent_scratchpad}
 """
 
 OPENAI_API_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
@@ -127,9 +116,21 @@ def initialize_sql_agent(db_config):
         raise ValueError("Invalid database configuration")
         
     # Check required fields
-    for field in required_fields:
-        if field not in db_config or not db_config[field]:
-            raise ValueError(f"Missing required field: {field}")
+    if "SQLite" in db_config.get('TYPE', 'MySQL'):
+        if not db_config.get('DATABASE'):
+             raise ValueError("Missing required field: DATABASE (Path)")
+    elif "Snowflake" in db_config.get('TYPE', 'MySQL'):
+        for field in ['USER', 'PASSWORD', 'HOST']:
+            if field not in db_config or not db_config[field]:
+                raise ValueError(f"Missing required field: {field}")
+    elif "Databricks" in db_config.get('TYPE', 'MySQL'):
+        for field in ['HOST', 'HTTP_PATH', 'PASSWORD']:
+            if field not in db_config or not db_config[field]:
+                raise ValueError(f"Missing required field: {field}")
+    else:
+        for field in required_fields:
+            if field not in db_config or not db_config[field]:
+                raise ValueError(f"Missing required field: {field}")
     
     try:
         # Initialize LLM first
@@ -141,11 +142,38 @@ def initialize_sql_agent(db_config):
         
         # Create database connection
         password = urllib.parse.quote_plus(db_config['PASSWORD'])
-        connection_string = (
-            f"mysql+pymysql://{db_config['USER']}:{password}@"
-            f"{db_config['HOST']}:{db_config['PORT']}/{db_config['DATABASE']}"
-            f"?ssl_ca={certifi.where()}&ssl_verify_cert=true&ssl_verify_identity=true"
-        )
+        
+        if "MySQL" in db_config.get('TYPE', 'MySQL'):
+            connection_string = (
+                f"mysql+pymysql://{db_config['USER']}:{password}@"
+                f"{db_config['HOST']}:{db_config['PORT']}/{db_config['DATABASE']}"
+                f"?ssl_ca={certifi.where()}&ssl_verify_cert=true&ssl_verify_identity=true"
+            )
+        elif "PostgreSQL" in db_config.get('TYPE', 'MySQL'):
+            connection_string = (
+                f"postgresql+psycopg2://{db_config['USER']}:{password}@"
+                f"{db_config['HOST']}:{db_config['PORT']}/{db_config['DATABASE']}"
+            )
+        elif "SQL Server" in db_config.get('TYPE', 'MySQL'):
+            connection_string = (
+                f"mssql+pymssql://{db_config['USER']}:{password}@"
+                f"{db_config['HOST']}:{db_config['PORT']}/{db_config['DATABASE']}"
+            )
+        elif "Snowflake" in db_config.get('TYPE', 'MySQL'):
+            connection_string = (
+                f"snowflake://{db_config['USER']}:{password}"
+                f"@{db_config['HOST']}/{db_config['DATABASE']}/{db_config.get('SCHEMA', 'PUBLIC')}"
+                f"?warehouse={db_config.get('WAREHOUSE', '')}&role={db_config.get('ROLE', '')}"
+            )
+        elif "Databricks" in db_config.get('TYPE', 'MySQL'):
+            # Revert to databricks:// but keep explicit schema in query params
+            connection_string = (
+                f"databricks://token:{password}"
+                f"@{db_config['HOST']}:443/{db_config['DATABASE']}"
+                f"?http_path={db_config['HTTP_PATH']}&catalog={db_config.get('CATALOG', 'hive_metastore')}&schema={db_config['DATABASE']}"
+            )
+        else: # SQLite
+            connection_string = f"sqlite:///{db_config['DATABASE']}"
         
         db = SQLDatabase.from_uri(connection_string)
         
@@ -158,19 +186,16 @@ def initialize_sql_agent(db_config):
         # Use in-memory history instead of SQL-backed history to avoid permission issues
         from langchain.memory import ChatMessageHistory
         message_history = ChatMessageHistory()
-        memory = ConversationBufferMemory(memory_key="chat_history", input_key='input', chat_memory=message_history, return_messages=False) #added recently
+        memory = ConversationBufferMemory(memory_key="chat_history", input_key='input', chat_memory=message_history, return_messages=True)
 
         # Create and return agent
         return create_sql_agent(
             llm=llm,
             toolkit=toolkit,
-            agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-            input_variables=["input", "agent_scratchpad", "chat_history"], #added recently
-            suffix=CUSTOM_SUFFIX, #added recently
-            memory=memory, #added recently
-            agent_executor_kwargs={"memory": memory}, #added recently
-            verbose=True,
-            handle_parsing_errors=True
+            agent_type="openai-tools",
+            prefix=SQL_SYSTEM_INSTRUCTIONS,
+            agent_executor_kwargs={"memory": memory},
+            verbose=True
         )
     except Exception as e:
         raise ValueError(f"Failed to initialize SQL agent: {str(e)}")
