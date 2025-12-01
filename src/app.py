@@ -19,84 +19,161 @@ import certifi  # Cross-platform SSL certificate authority bundle
 OPENAI_API_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
 st.set_page_config(page_title="SQL and Python Agent", layout="wide")
 
-def inject_custom_css():
-    st.markdown("""
+def inject_custom_css(is_dark_mode):
+    if is_dark_mode:
+        colors = {
+            "bg_app": "#18181B",      # Zinc 950 (Softer black)
+            "bg_sidebar": "#27272A",  # Zinc 800
+            "text": "#FAFAFA",        # Zinc 50
+            "card_bg": "#27272A",
+            "card_border": "#3F3F46", # Zinc 700
+            "input_bg": "#3F3F46",
+            "input_border": "#52525B",# Zinc 600
+            "input_text": "#FAFAFA",
+            "primary": "#3B82F6",     # Solid Blue 500
+            "button_text": "#FFFFFF"
+        }
+    else:
+        colors = {
+            "bg_app": "#FFFFFF",
+            "bg_sidebar": "#F4F4F5",  # Zinc 100
+            "text": "#18181B",        # Zinc 900
+            "card_bg": "#FFFFFF",
+            "card_border": "#E4E4E7", # Zinc 200
+            "input_bg": "#FFFFFF",
+            "input_border": "#D4D4D8",# Zinc 300
+            "input_text": "#18181B",
+            "primary": "#2563EB",     # Solid Blue 600
+            "button_text": "#FFFFFF"
+        }
+
+    st.markdown(f"""
     <style>
         /* Import Google Font */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         
-        html, body, [class*="css"] {
+        html, body, [class*="css"] {{
             font-family: 'Inter', sans-serif;
-        }
+            color: {colors['text']};
+        }}
         
-        /* Gradient Title */
-        h1 {
-            background: linear-gradient(to right, #4F46E5, #06B6D4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        /* App Background */
+        .stApp {{
+            background-color: {colors['bg_app']};
+        }}
+        
+        /* Title - Solid Color, No Gradient */
+        h1 {{
+            color: {colors['text']};
             font-weight: 800;
             padding-bottom: 10px;
-        }
+        }}
         
         /* Card-like styling for chat messages */
-        .stChatMessage {
-            background-color: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
+        .stChatMessage {{
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['card_border']};
+            border-radius: 12px;
             padding: 15px;
             margin-bottom: 10px;
-            transition: transform 0.2s;
-        }
-        
-        .stChatMessage:hover {
-            transform: scale(1.005);
-            background-color: rgba(255, 255, 255, 0.08);
-        }
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }}
         
         /* Sidebar styling */
-        [data-testid="stSidebar"] {
-            background-color: #0F172A;
-            border-right: 1px solid #1E293B;
-        }
+        [data-testid="stSidebar"] {{
+            background-color: {colors['bg_sidebar']};
+            border-right: 1px solid {colors['card_border']};
+        }}
         
-        /* Custom Button */
-        div.stButton > button {
-            background: linear-gradient(to right, #4F46E5, #06B6D4);
-            color: white;
+        /* Custom Button - Solid Color */
+        div.stButton > button {{
+            background-color: {colors['primary']};
+            color: {colors['button_text']};
             border: none;
             border-radius: 8px;
             padding: 0.6rem 1.2rem;
             font-weight: 600;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             width: 100%;
-        }
+        }}
         
-        div.stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
-        }
+        div.stButton > button:hover {{
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }}
         
         /* Input fields */
-        .stTextInput input {
+        .stTextInput input {{
             border-radius: 8px;
-            border: 1px solid #334155;
-            background-color: #1E293B;
-            color: white;
-        }
+            border: 1px solid {colors['input_border']};
+            background-color: {colors['input_bg']};
+            color: {colors['input_text']};
+        }}
         
-        .stTextInput input:focus {
-            border-color: #4F46E5;
-            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
-        }
+        .stTextInput input:focus {{
+            border-color: {colors['primary']};
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }}
         
-        /* Success/Error messages */
-        .stAlert {
+        /* Text color overrides */
+        p, label, .stMarkdown {{
+            color: {colors['text']} !important;
+        }}
+        
+        /* Welcome Banner */
+        .welcome-banner {{
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['card_border']};
+            border-left: 5px solid {colors['primary']};
+            padding: 20px;
             border-radius: 10px;
-        }
+            margin-bottom: 20px;
+        }}
+        
+        /* Chat Input Styling */
+        .stChatInput textarea {{
+            background-color: {colors['input_bg']} !important;
+            color: {colors['input_text']} !important;
+            border: 1px solid {colors['input_border']} !important;
+        }}
+        
+        /* Fix for the bottom container background to match app background */
+        [data-testid="stBottom"], footer, header {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        [data-testid="stBottom"] > div {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        /* Ensure the main container background is consistent */
+        .stApp > header {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        .stApp {{
+            background-color: {colors['bg_app']};
+        }}
+        
+        /* Chat Input Container */
+        .stChatInput {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        .stChatInputContainer {{
+            background-color: {colors['bg_app']} !important;
+        }}
     </style>
     """, unsafe_allow_html=True)
 
-inject_custom_css()
+# Theme Toggle
+with st.sidebar:
+    st.title("⚙️ Appearance")
+    is_dark_mode = st.toggle("🌙 Dark Mode", value=True)
+    st.markdown("---")
+
+inject_custom_css(is_dark_mode)
 
 def reset_conversation():
     st.session_state.messages = []
@@ -234,7 +311,7 @@ if st.session_state.db_connected and st.session_state.databases:
 # Main page
 st.title("SQL & Python AI Agent 🤖")
 st.markdown("""
-    <div style='background-color: rgba(79, 70, 229, 0.1); padding: 20px; border-radius: 10px; border-left: 5px solid #4F46E5; margin-bottom: 20px;'>
+    <div class="welcome-banner">
         <p style='font-size: 1.1rem; margin: 0;'>
             <strong>Welcome!</strong> This intelligent agent transforms your natural language questions into 
             <strong>SQL queries</strong> and <strong>Python visualizations</strong>. 
