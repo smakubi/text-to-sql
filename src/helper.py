@@ -2,15 +2,38 @@ import re
 import string
 import streamlit as st
 
-
 def display_code_plots(text):
     pattern = r'```python\s(.*?)```'
     matches = re.findall(pattern, text, re.DOTALL)
     if not matches:
         return None
     else:
-        return matches[0]
-
+        code = matches[0]
+        # Replace fig.show() with Streamlit's display method to render inline
+        # Replace fig.show() with Streamlit's display method to render inline
+        if "fig.show()" in code:
+            # Inject template based on current theme if possible, or just default to a good one
+            if st.session_state.get('dark_mode', True):
+                theme_code = "fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')"
+            else:
+                theme_code = "fig.update_layout(template='plotly_white', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')"
+            
+            # Insert theme update before showing
+            code = code.replace("fig.show()", f"{theme_code}\nst.plotly_chart(fig, use_container_width=True)")
+            
+        # Ensure common libraries are imported
+        imports = []
+        if "pandas" not in code and "pd." in code:
+            imports.append("import pandas as pd")
+        if "plotly.graph_objects" not in code and "go." in code:
+            imports.append("import plotly.graph_objects as go")
+        if "plotly.express" not in code and "px." in code:
+            imports.append("import plotly.express as px")
+            
+        if imports:
+            code = "\n".join(imports) + "\n" + code
+            
+        return code
 
 def display_text_with_images(text):
     """
@@ -43,3 +66,198 @@ def display_text_with_images(text):
         # Display the image if it exists
         if i < len(image_urls):
             st.image(image_urls[i])
+
+def inject_custom_css(is_dark_mode):
+    if is_dark_mode:
+        colors = {
+            "bg_app": "#18181B",      # Zinc 950 (Softer black)
+            "bg_sidebar": "#27272A",  # Zinc 800
+            "text": "#FAFAFA",        # Zinc 50
+            "card_bg": "#27272A",
+            "card_border": "#3F3F46", # Zinc 700
+            "input_bg": "#3F3F46",
+            "input_border": "#52525B",# Zinc 600
+            "input_text": "#FAFAFA",
+            "primary": "#3B82F6",     # Solid Blue 500
+            "button_text": "#FFFFFF"
+        }
+    else:
+        colors = {
+            "bg_app": "#FFFFFF",
+            "bg_sidebar": "#F4F4F5",  # Zinc 100
+            "text": "#18181B",        # Zinc 900
+            "card_bg": "#FFFFFF",
+            "card_border": "#E4E4E7", # Zinc 200
+            "input_bg": "#FFFFFF",
+            "input_border": "#D4D4D8",# Zinc 300
+            "input_text": "#18181B",
+            "primary": "#2563EB",     # Solid Blue 600
+            "button_text": "#FFFFFF"
+        }
+
+    st.markdown(f"""
+    <style>
+        /* Import Google Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        html, body, [class*="css"] {{
+            font-family: 'Inter', sans-serif;
+            color: {colors['text']};
+        }}
+        
+        /* App Background */
+        .stApp {{
+            background-color: {colors['bg_app']};
+        }}
+        
+        /* Title - Solid Color, No Gradient */
+        h1 {{
+            color: {colors['text']};
+            font-weight: 800;
+            padding-bottom: 10px;
+        }}
+        
+        /* Card-like styling for chat messages */
+        .stChatMessage {{
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['card_border']};
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }}
+        
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {{
+            background-color: {colors['bg_sidebar']};
+            border-right: 1px solid {colors['card_border']};
+        }}
+        
+        [data-testid="stSidebar"] .block-container {{
+            padding-top: 1rem;
+        }}
+        
+        /* Custom Button - Solid Color */
+        div.stButton > button {{
+            background-color: {colors['primary']};
+            color: {colors['button_text']};
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            width: 100%;
+        }}
+        
+        div.stButton > button:hover {{
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }}
+        
+        /* Input fields */
+        .stTextInput input {{
+            border-radius: 8px;
+            border: 1px solid {colors['input_border']};
+            background-color: {colors['input_bg']};
+            color: {colors['input_text']};
+        }}
+        
+        .stTextInput input:focus {{
+            border-color: {colors['primary']};
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }}
+        
+        /* Text color overrides */
+        p, label, .stMarkdown {{
+            color: {colors['text']} !important;
+        }}
+        
+        /* Welcome Banner */
+        .welcome-banner {{
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['card_border']};
+            border-left: 5px solid {colors['primary']};
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }}
+        
+        /* Chat Input Styling */
+        .stChatInput textarea {{
+            background-color: {colors['input_bg']} !important;
+            color: {colors['input_text']} !important;
+            border: 1px solid {colors['input_border']} !important;
+        }}
+        
+        /* Fix for the bottom container background to match app background */
+        [data-testid="stBottom"], footer, header {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        [data-testid="stBottom"] > div {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        /* Ensure the main container background is consistent */
+        .stApp > header {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        .stApp {{
+            background-color: {colors['bg_app']};
+        }}
+        
+        /* Chat Input Container */
+        .stChatInput {{
+            background-color: {colors['bg_app']} !important;
+        }}
+        
+        /* Alerts */
+        .stAlert {{
+            background-color: {colors['card_bg']};
+            border: 1px solid {colors['card_border']};
+            color: {colors['text']};
+        }}
+        
+        /* Code blocks */
+        code, pre {{
+            background-color: {colors['input_bg']} !important;
+            color: {colors['text']} !important;
+            border-radius: 6px;
+        }}
+        
+        /* Plotly chart background */
+        .js-plotly-plot .plotly .main-svg {{
+            background-color: transparent !important;
+        }}
+        
+        /* Tool output (expanders) styling to look like code */
+        [data-testid="stExpanderDetails"] {{
+            background-color: {colors['input_bg']};
+            border-radius: 8px;
+            padding: 10px;
+        }}
+        
+        [data-testid="stExpanderDetails"] * {{
+            font-family: 'Fira Code', 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
+            font-size: 0.85rem !important;
+        }}
+        
+        /* Sticky Header */
+        .sticky-header {{
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: {colors['bg_app']};
+            padding: 1rem 0;
+            border-bottom: 1px solid {colors['card_border']};
+            margin-bottom: 1rem;
+        }}
+        
+        .sticky-header h1 {{
+            margin: 0;
+            padding: 0;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
