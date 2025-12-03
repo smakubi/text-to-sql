@@ -8,14 +8,14 @@ import warnings
 from llm_agent import initialize_sql_agent, initialize_python_agent
 from helper import display_code_plots, display_text_with_images, inject_custom_css
 from database import test_connection, get_snowflake_schemas
-from auth import verify_user, save_user, update_user_settings, get_user_settings, get_user_info
+from auth import verify_user, save_user, update_user_settings, get_user_settings, get_user_info, create_access_token, verify_access_token
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="databricks.sql")
 warnings.filterwarnings("ignore", message="Parameter '_user_agent_entry' is deprecated")
 
 # Page Config
-st.set_page_config(page_title="Vortex", page_icon="◈", layout="wide")
+st.set_page_config(page_title="Vortex", page_icon="src/assets/favicon.png", layout="wide")
 OPENAI_API_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
 
 def init_session_state():
@@ -62,6 +62,29 @@ def init_session_state():
         st.session_state.sql_agent = None
     if "python_agent" not in st.session_state:
         st.session_state.python_agent = None
+
+    # Check for persistent login token
+    if not st.session_state.authenticated:
+        token = st.query_params.get("token")
+        if token:
+            username = verify_access_token(token)
+            if username:
+                st.session_state.authenticated = True
+                st.session_state.current_user = username
+                
+                # Get full name
+                user_info = get_user_info(username)
+                full_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+                if not full_name:
+                    full_name = username
+                st.session_state.current_user_fullname = full_name
+                
+                # Load user settings
+                settings = get_user_settings(username)
+                if "saved_connections" in settings:
+                    st.session_state.saved_connections = settings["saved_connections"]
+                elif "db_config" in settings:
+                    st.session_state.saved_connections = {"Default": settings["db_config"]}
 
 def login_page():
     """Render the login page."""
@@ -135,7 +158,7 @@ def login_page():
             with st.form("login_form"):
                 username = st.text_input("Username")
                 password = st.text_input("Password", type="password")
-                submit = st.form_submit_button("Login", use_container_width=True)
+                submit = st.form_submit_button("Login", type="primary", use_container_width=True)
                 
                 if submit:
                     if verify_user(username, password):
@@ -157,6 +180,10 @@ def login_page():
                         elif "db_config" in settings:
                             st.session_state.saved_connections = {"Default": settings["db_config"]}
                             
+                        # Set persistent login token
+                        token = create_access_token(data={"sub": username})
+                        st.query_params["token"] = token
+                        
                         st.rerun()
                     else:
                         st.error("Invalid username or password")
@@ -172,7 +199,7 @@ def login_page():
                 new_user = st.text_input("New Username")
                 new_pass = st.text_input("New Password", type="password")
                 confirm_pass = st.text_input("Confirm Password", type="password")
-                submit_signup = st.form_submit_button("Sign Up", use_container_width=True)
+                submit_signup = st.form_submit_button("Sign Up", type="primary", use_container_width=True)
                 
                 if submit_signup:
                     if new_pass != confirm_pass:
@@ -197,15 +224,15 @@ def login_page():
         sc1, sc2 = st.columns(2)
         
         with sc1:
-            if st.button("🔍 Google", use_container_width=True):
+            if st.button("Google", use_container_width=True):
                 st.toast("Google login coming soon!")
-            if st.button("📷 Instagram", use_container_width=True):
+            if st.button("Instagram", use_container_width=True):
                 st.toast("Instagram login coming soon!")
                 
         with sc2:
-            if st.button("📘 Facebook", use_container_width=True):
+            if st.button("Facebook", use_container_width=True):
                 st.toast("Facebook login coming soon!")
-            if st.button("💼 LinkedIn", use_container_width=True):
+            if st.button("LinkedIn", use_container_width=True):
                 st.toast("LinkedIn login coming soon!")
 
 def reset_conversation():
@@ -233,19 +260,21 @@ def render_top_bar():
     with col2:
         if st.session_state.authenticated:
             display_name = st.session_state.get("current_user_fullname") or st.session_state.current_user
-            with st.popover(f"👤 {display_name}"):
-                if st.button("👤 Profile", use_container_width=True):
+            with st.popover(f"{display_name}"):
+                if st.button("Profile", use_container_width=True):
                     st.session_state.view_mode = "profile"
                     st.rerun()
-                if st.button("💬 Chat", use_container_width=True):
+                if st.button("Chat", use_container_width=True):
                     st.session_state.view_mode = "chat"
                     st.rerun()
                 st.markdown("---")
-                if st.button("🚪 Logout", use_container_width=True):
+                if st.button("Logout", use_container_width=True):
                     st.session_state.authenticated = False
                     st.session_state.current_user = None
                     st.session_state.current_user_fullname = None
                     st.session_state.view_mode = "chat"
+                    if "token" in st.query_params:
+                        del st.query_params["token"]
                     st.rerun()
 
 def render_profile():
@@ -253,14 +282,14 @@ def render_profile():
     display_name = st.session_state.get("current_user_fullname") or st.session_state.current_user
     st.markdown(f"""
         <div class="sticky-header">
-            <h1><span style="color: #667eea; margin-right: 8px;">👤</span>{display_name}</h1>
+            <h1>{display_name}</h1>
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown(f'<h3>👋 Welcome, {display_name}!</h3>', unsafe_allow_html=True)
+    st.markdown(f'<h3>Welcome, {display_name}!</h3>', unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown('<h3>💾 Saved Database Configurations</h3>', unsafe_allow_html=True)
+    st.markdown('<h3>Saved Database Configurations</h3>', unsafe_allow_html=True)
     
     if not st.session_state.saved_connections:
         st.info("No saved connections yet. Connect to a database in the sidebar to save one.")
@@ -270,7 +299,7 @@ def render_profile():
         connection_to_delete = None
         
         for name, config in st.session_state.saved_connections.items():
-            with st.expander(f"🗄️ {name}"):
+            with st.expander(f"{name}"):
                 with st.form(key=f"edit_form_{name}"):
                     # Type Selection
                     db_type_options = ["MySQL", "PostgreSQL", "SQL Server", "SQLite", "Snowflake", "Databricks"]
@@ -303,7 +332,7 @@ def render_profile():
                         new_http = st.text_input("HTTP Path", value=new_http, key=f"http_{name}")
                         new_catalog = st.text_input("Catalog", value=new_catalog, key=f"cat_{name}")
 
-                    if st.form_submit_button("Save Changes"):
+                    if st.form_submit_button("Save Changes", type="primary"):
                         # Update config
                         updated_config = config.copy()
                         updated_config.update({
@@ -337,7 +366,7 @@ def render_profile():
             st.rerun()
     
     st.markdown("---")
-    if st.button("← Back to Chat"):
+    if st.button("Back to Chat"):
         st.session_state.view_mode = "chat"
         st.rerun()
 
@@ -345,14 +374,14 @@ def render_sidebar():
     """Render the sidebar configuration."""
     with st.sidebar:
         # Theme Toggle
-        st.markdown('<p class="sidebar-section-title">⚙️ Appearance</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sidebar-section-title">Appearance</p>', unsafe_allow_html=True)
         dark_mode = st.toggle("Dark Mode", value=st.session_state.dark_mode, key="dark_mode_toggle")
         if dark_mode != st.session_state.dark_mode:
             st.session_state.dark_mode = dark_mode
             st.rerun()
 
         st.markdown("---")
-        st.markdown('<p class="sidebar-section-title">🗄️ Connect Database</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sidebar-section-title">Connect Database</p>', unsafe_allow_html=True)
         
         # Load Saved Connections
         saved_names = ["New Connection"] + list(st.session_state.saved_connections.keys())
@@ -424,7 +453,7 @@ def render_sidebar():
 
         # Connect Button
         button_label = "Connect & Save" if not st.session_state.db_connected else "Update Connection"
-        if st.button(button_label):
+        if st.button(button_label, type="primary"):
             with st.spinner("Testing connection..."):
                 ok, db_list = test_connection(config)
                 if ok:
@@ -498,9 +527,12 @@ def render_sidebar():
                     st.error(f"Agent Initialization Failed: {e}")
 
         st.markdown("---")
-        if st.button("🔄 Reset Conversation"):
-            reset_conversation()
-            st.rerun()
+        # Reset Conversation button moved to main chat area
+            
+        st.markdown('<p class="sidebar-section-title">Support</p>', unsafe_allow_html=True)
+        st.markdown("If you enjoy using Vortex, consider supporting the development!")
+        # Replace the URL below with your actual Stripe Payment Link
+        st.link_button("☕ Buy me a coffee", "https://buy.stripe.com/your-stripe-link-here", type="primary", use_container_width=True)
 
 def render_chat():
     """Render the main chat interface."""
@@ -511,10 +543,16 @@ def render_chat():
         </div>
     """, unsafe_allow_html=True)
     
+    # Reset Button - Fixed at bottom right via CSS
+    st.markdown('<span id="reset-btn-marker"></span>', unsafe_allow_html=True)
+    if st.button("Reset", key="reset_btn", help="Start a new conversation", type="primary"):
+        reset_conversation()
+        st.rerun()
+    
     # Welcome Banner with modern styling
     st.markdown("""
     <div class="welcome-banner">
-        <h3>✨ Welcome to Vortex</h3>
+        <h3>Welcome to Vortex</h3>
         <p>Transform your natural language questions into powerful SQL queries and beautiful Python visualizations. 
         Connect your database using the sidebar to get started.</p>
     </div>
@@ -532,7 +570,7 @@ def render_chat():
     # Chat History
     for message in st.session_state.messages:
         role = message["role"]
-        avatar = "🚀" if role == "user" else "✨"
+        avatar = None # Use default avatars for cleaner look
         with st.chat_message(role, avatar=avatar):
             if role == "assistant":
                 display_text_with_images(message["content"])
@@ -548,10 +586,10 @@ def render_chat():
     # Chat Input
     if prompt := st.chat_input("Please ask your question:"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user", avatar="🚀"):
+        with st.chat_message("user", avatar=None):
             st.markdown(prompt)
 
-        with st.chat_message("assistant", avatar="✨"):
+        with st.chat_message("assistant", avatar=None):
             if not st.session_state.db_connected or not st.session_state.sql_agent:
                 response = "Please configure and connect to a database using the sidebar before running queries."
                 st.markdown(response)
@@ -564,7 +602,7 @@ def render_chat():
                         # Chain of Agents: SQL Agent (Get Data) -> Python Agent (Visualize)
                         
                         # Step 1: Fetch Data
-                        st.markdown('<h5>🔍 Fetching data...</h5>', unsafe_allow_html=True)
+                        st.markdown('<h5>Fetching data...</h5>', unsafe_allow_html=True)
                         fetch_prompt = (
                             f"Please fetch the data required to answer this request: '{prompt}'. "
                             "Do not generate any plots or images yourself. "
@@ -579,7 +617,7 @@ def render_chat():
                             {"callbacks": [StreamlitCallbackHandler(st.container())]}
                         )
                         data_context = sql_response['output']
-                        st.markdown('<h5 style="color: #22c55e;">✅ Data fetched!</h5>', unsafe_allow_html=True)
+                        st.markdown('<h5 style="color: #22c55e;">Data fetched!</h5>', unsafe_allow_html=True)
 
                         # Step 2: Visualize Data
                         visualize_prompt = (

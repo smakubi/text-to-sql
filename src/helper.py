@@ -80,13 +80,13 @@ def inject_custom_css(is_dark_mode):
             "input_bg": "#252547",
             "input_border": "rgba(255, 255, 255, 0.2)",
             "input_text": "#ffffff",
-            "primary": "#667eea",
-            "primary_gradient": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "primary": "#667FEA",
+            "primary_gradient": "linear-gradient(135deg, #667FEA 0%, #764ba2 100%)",
             "button_text": "#ffffff",
             "secondary_bg": "#1a1a3e",
             "accent": "#f093fb",
             "success": "#4ade80",
-            "user_bubble": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "user_bubble": "linear-gradient(135deg, #667FEA 0%, #764ba2 100%)",
             "assistant_bubble": "#1e1e3f",
         }
     else:
@@ -101,13 +101,13 @@ def inject_custom_css(is_dark_mode):
             "input_bg": "#ffffff",
             "input_border": "rgba(0, 0, 0, 0.12)",
             "input_text": "#1a1a2e",
-            "primary": "#667eea",
-            "primary_gradient": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "primary": "#667FEA",
+            "primary_gradient": "linear-gradient(135deg, #667FEA 0%, #764ba2 100%)",
             "button_text": "#ffffff",
             "secondary_bg": "#f8fafc",
             "accent": "#764ba2",
             "success": "#22c55e",
-            "user_bubble": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "user_bubble": "linear-gradient(135deg, #667FEA 0%, #764ba2 100%)",
             "assistant_bubble": "#ffffff",
         }
 
@@ -304,11 +304,8 @@ def inject_custom_css(is_dark_mode):
             opacity: 0.7;
         }}
         
-        /* Buttons - Primary Gradient Style */
+        /* Buttons - General Reset */
         div.stButton > button {{
-            background: {colors['primary_gradient']};
-            color: {colors['button_text']};
-            border: none;
             border-radius: var(--radius-md);
             padding: 0.625rem 1.25rem;
             font-family: var(--font-sans);
@@ -319,28 +316,106 @@ def inject_custom_css(is_dark_mode):
             box-shadow: var(--shadow-sm);
             cursor: pointer;
         }}
+
+        /* Primary Action Buttons (Login, Signup, Save, Connect, Reset) */
+        div.stButton > button[kind="primary"],
+        div.stButton > button[data-testid="baseButton-primary"],
+        [data-testid="stFormSubmitButton"] button,
+        [data-testid="stFormSubmitButton"] > button,
+        button[kind="primary"] {{
+            background: {colors['primary']} !important;
+            color: #ffffff !important;
+            border: none !important;
+        }}
         
-        div.stButton > button:hover {{
+        div.stButton > button[kind="primary"] p,
+        div.stButton > button[kind="primary"] *,
+        div.stButton > button[data-testid="baseButton-primary"] *,
+        [data-testid="stFormSubmitButton"] button *,
+        button[kind="primary"] * {{
+            color: #ffffff !important;
+            fill: #ffffff !important;
+        }}
+        
+        div.stButton > button[kind="primary"]:hover,
+        div.stButton > button[data-testid="baseButton-primary"]:hover,
+        [data-testid="stFormSubmitButton"] button:hover,
+        button[kind="primary"]:hover {{
             transform: translateY(-2px);
             box-shadow: var(--shadow-lg), 0 0 20px {colors['primary']}40;
             filter: brightness(1.1);
+            color: #ffffff !important;
+        }}
+
+        div.stButton > button[kind="primary"]:hover p,
+        div.stButton > button[kind="primary"]:hover *,
+        div.stButton > button[data-testid="baseButton-primary"]:hover *,
+        [data-testid="stFormSubmitButton"] button:hover *,
+        button[kind="primary"]:hover * {{
+            color: #ffffff !important;
+            fill: #ffffff !important;
         }}
         
-        div.stButton > button:active {{
+        /* Reset Button - Fixed Position at Bottom Right */
+        /* Target the button that follows the marker */
+        div:has(> div > div > span#reset-btn-marker) + div button,
+        div:has(span#reset-btn-marker) + div button,
+        div:has(#reset-btn-marker) + div button,
+        button[title="Start a new conversation"] {{
+            position: fixed !important;
+            bottom: 40px !important; /* Adjusted to align with input center */
+            right: 2rem !important;
+            z-index: 99999 !important;
+            width: auto !important;
+            min-width: 100px !important;
+            height: auto !important;
+            padding: 0.6rem 1.2rem !important;
+            border-radius: var(--radius-md) !important;
+            box-shadow: var(--shadow-lg) !important;
+            background: {colors['primary']} !important;
+            color: #ffffff !important;
+        }}
+        
+        /* Adjust bottom container to make space for the button */
+        [data-testid="stBottom"] > div {{
+            background: {colors['bg_app']} !important;
+            padding: 1rem;
+            padding-right: 180px !important; /* Increased space */
+            border-top: 1px solid {colors['card_border']};
+        }}
+        
+        div:has(#reset-btn-marker) + div button p,
+        button[title="Start a new conversation"] p {{
+            color: #ffffff !important;
+        }}
+        
+        div:has(#reset-btn-marker) + div button:hover,
+        button[title="Start a new conversation"]:hover {{
+            transform: translateY(-2px) !important;
+            box-shadow: 0 10px 25px -5px {colors['primary']}60 !important;
+        }}
+        
+        div.stButton > button[kind="primary"]:active {{
             transform: translateY(0);
         }}
         
-        /* Secondary/Outline Buttons */
+        /* Secondary/Neutral Buttons (Back, Profile, etc) */
         div.stButton > button[kind="secondary"] {{
-            background: transparent;
-            color: {colors['text']};
-            border: 2px solid {colors['input_border']};
+            background: transparent !important;
+            color: {colors['text']} !important;
+            border: 2px solid {colors['input_border']} !important;
+            box-shadow: none !important;
         }}
         
         div.stButton > button[kind="secondary"]:hover {{
-            border-color: {colors['primary']};
-            color: {colors['primary']};
-            background: {colors['primary']}10;
+            border-color: {colors['primary']} !important;
+            color: {colors['primary']} !important;
+            background: {colors['input_bg']} !important;
+            transform: translateY(-1px);
+        }}
+
+        div.stButton > button[kind="secondary"]:active {{
+            transform: translateY(0);
         }}
         
         /* Input Fields - Text inputs */
@@ -515,8 +590,12 @@ def inject_custom_css(is_dark_mode):
         }}
         
         .stTabs [aria-selected="true"] {{
-            background: {colors['primary']};
-            color: white !important;
+            background: {colors['primary']} !important;
+            color: #ffffff !important;
+        }}
+
+        .stTabs [aria-selected="true"] p {{
+            color: #ffffff !important;
         }}
         
         .stTabs [data-baseweb="tab-highlight"] {{
@@ -648,20 +727,47 @@ def inject_custom_css(is_dark_mode):
             background: {colors['card_bg']} !important;
             border: 1px solid {colors['card_border']} !important;
             border-radius: var(--radius-md) !important;
+            padding: 0.5rem !important;
         }}
         
         [data-testid="stPopoverBody"] > div {{
             background: {colors['card_bg']} !important;
+            gap: 0.5rem !important;
         }}
         
-        [data-testid="stPopoverBody"] button {{
-            background: {colors['card_bg']} !important;
+        /* Target buttons inside popover specifically - High Specificity */
+        div[data-testid="stPopoverBody"] div.stButton > button {{
+            background: transparent !important;
             color: {colors['text']} !important;
             border: none !important;
+            box-shadow: none !important;
+            text-align: left !important;
+            justify-content: flex-start !important;
+            padding: 0.5rem 1rem !important;
+            width: 100% !important;
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            z-index: 1000 !important;
+            margin: 0 !important;
         }}
         
-        [data-testid="stPopoverBody"] button:hover {{
+        div[data-testid="stPopoverBody"] div.stButton > button:hover {{
             background: {colors['input_bg']} !important;
+            color: {colors['primary']} !important;
+        }}
+        
+        div[data-testid="stPopoverBody"] div.stButton > button p {{
+            color: inherit !important;
+            font-weight: 500 !important;
+        }}
+        
+        /* Ensure popover body allows content to be seen */
+        [data-testid="stPopoverBody"] {{
+            overflow: visible !important;
+            max-height: none !important;
         }}
         
         /* Popover container and all children */
@@ -675,13 +781,9 @@ def inject_custom_css(is_dark_mode):
             border-radius: var(--radius-md) !important;
         }}
         
-        /* All nested divs in popover */
-        div[data-baseweb="popover"] div {{
-            background: {colors['card_bg']} !important;
-        }}
-        
         div[data-baseweb="popover"] hr {{
             border-color: {colors['card_border']} !important;
+            margin: 0.25rem 0 !important;
         }}
         
         /* Forms */
@@ -692,16 +794,16 @@ def inject_custom_css(is_dark_mode):
             padding: 1.5rem;
         }}
         
-        /* Form Submit Button - Neutral/subtle style */
+        /* Form Submit Button - Primary style */
         [data-testid="stFormSubmitButton"] button,
         [data-testid="stFormSubmitButton"] > button,
         [data-testid="stForm"] button[kind="primary"],
         [data-testid="stForm"] button[type="submit"],
         .stForm button,
         form button[type="submit"] {{
-            background: {colors['input_bg']} !important;
-            color: {colors['text']} !important;
-            border: 2px solid {colors['input_border']} !important;
+            background: {colors['primary']} !important;
+            color: #ffffff !important;
+            border: none !important;
             border-radius: var(--radius-md) !important;
             padding: 0.625rem 1.25rem !important;
             font-family: var(--font-sans) !important;
@@ -709,8 +811,17 @@ def inject_custom_css(is_dark_mode):
             font-size: 0.9rem !important;
             letter-spacing: 0.01em !important;
             transition: var(--transition-normal) !important;
-            box-shadow: none !important;
+            box-shadow: var(--shadow-sm) !important;
             cursor: pointer !important;
+        }}
+        
+        [data-testid="stFormSubmitButton"] button p,
+        [data-testid="stFormSubmitButton"] > button p,
+        [data-testid="stForm"] button[kind="primary"] p,
+        [data-testid="stForm"] button[type="submit"] p,
+        .stForm button p,
+        form button[type="submit"] p {{
+            color: #ffffff !important;
         }}
         
         [data-testid="stFormSubmitButton"] button:hover,
@@ -719,11 +830,12 @@ def inject_custom_css(is_dark_mode):
         [data-testid="stForm"] button[type="submit"]:hover,
         .stForm button:hover,
         form button[type="submit"]:hover {{
-            border-color: {colors['primary']} !important;
-            color: {colors['primary']} !important;
-            background: {colors['input_bg']} !important;
-            transform: translateY(-1px) !important;
-            box-shadow: var(--shadow-sm) !important;
+            background: {colors['primary']} !important;
+            transform: translateY(-2px) !important;
+            box-shadow: var(--shadow-lg), 0 0 20px {colors['primary']}40 !important;
+            filter: brightness(1.1) !important;
+            color: {colors['button_text']} !important;
+            border: none !important;
         }}
         
         [data-testid="stFormSubmitButton"] button:active,
@@ -796,11 +908,7 @@ def inject_custom_css(is_dark_mode):
             background: transparent !important;
         }}
         
-        [data-testid="stBottom"] > div {{
-            background: {colors['bg_app']} !important;
-            padding: 1rem;
-            border-top: 1px solid {colors['card_border']};
-        }}
+        /* Removed duplicate stBottom rule to avoid conflicts */
         
         /* Sticky Header */
         .sticky-header {{

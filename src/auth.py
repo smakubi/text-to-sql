@@ -2,8 +2,13 @@ import json
 import os
 import hashlib
 import streamlit as st
+import jwt
+from datetime import datetime, timedelta
 
 USERS_FILE = "users.json"
+SECRET_KEY = "vortex-secret-key-change-me" # In production, use st.secrets
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 days
 
 def hash_password(password):
     """Hash a password for storing."""
@@ -92,3 +97,22 @@ def get_user_settings(username):
     if username in users:
         return users[username].get("settings", {})
     return {}
+
+def create_access_token(data: dict):
+    """Create a JWT access token."""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_access_token(token: str):
+    """Verify a JWT access token."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            return None
+        return username
+    except jwt.PyJWTError:
+        return None
