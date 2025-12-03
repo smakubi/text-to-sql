@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="databrick
 warnings.filterwarnings("ignore", message="Parameter '_user_agent_entry' is deprecated")
 
 # Page Config
-st.set_page_config(page_title="Vortex", page_icon="🌀", layout="wide")
+st.set_page_config(page_title="Vortex", page_icon="◈", layout="wide")
 OPENAI_API_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
 
 def init_session_state():
@@ -26,7 +26,7 @@ def init_session_state():
         st.session_state.db_connected = False
     if "db_config" not in st.session_state:
         st.session_state.db_config = {
-            'TYPE': 'MySQL 🐬',
+            'TYPE': 'MySQL',
             'USER': '',
             'PASSWORD': '',
             'HOST': '',
@@ -65,10 +65,65 @@ def init_session_state():
 
 def login_page():
     """Render the login page."""
-    st.markdown("""
-        <div style='text-align: center; margin-top: 50px; margin-bottom: 30px;'>
-            <h1>🔒 Welcome to Vortex</h1>
-            <p style='color: #666;'>Please login or create an account to continue.</p>
+    # Adaptive colors based on dark mode
+    is_dark = st.session_state.get('dark_mode', False)
+    text_secondary = "#a0a0b0" if is_dark else "#6b7280"
+    divider_color = "rgba(255, 255, 255, 0.1)" if is_dark else "#e5e7eb"
+    
+    st.markdown(f"""
+        <style>
+            .login-container {{
+                max-width: 420px;
+                margin: 0 auto;
+                padding: 2rem;
+            }}
+            .login-header {{
+                text-align: center;
+                margin-bottom: 2rem;
+            }}
+            .login-header h1 {{
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                font-size: 3.5rem;
+                font-weight: 700;
+                color: #667eea;
+                margin-bottom: 0.5rem;
+                letter-spacing: -0.02em;
+            }}
+            .login-header p {{
+                color: {text_secondary};
+                font-size: 1.1rem;
+            }}
+            .login-card {{
+                background: white;
+                border-radius: 16px;
+                padding: 2rem;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                border: 1px solid rgba(0, 0, 0, 0.05);
+            }}
+            .social-divider {{
+                display: flex;
+                align-items: center;
+                text-align: center;
+                margin: 1.5rem 0;
+                color: {text_secondary};
+                font-size: 0.875rem;
+            }}
+            .social-divider::before,
+            .social-divider::after {{
+                content: '';
+                flex: 1;
+                border-bottom: 1px solid {divider_color};
+            }}
+            .social-divider::before {{
+                margin-right: 1rem;
+            }}
+            .social-divider::after {{
+                margin-left: 1rem;
+            }}
+        </style>
+        <div class="login-header">
+            <h1><span style="color: #667eea;">◈</span> Vortex</h1>
+            <p>Transform natural language into powerful SQL queries</p>
         </div>
     """, unsafe_allow_html=True)
     
@@ -133,29 +188,25 @@ def login_page():
                             st.error(msg)
         
         if "auth" not in st.secrets:
-            st.info("💡 Default credentials: admin / admin")
+            st.info("Default credentials: **admin** / **admin**")
 
-        st.markdown("""
-            <div style='text-align: center; margin: 20px 0; color: #888; font-size: 0.9em;'>
-                — OR —
-            </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="social-divider">or continue with</div>', unsafe_allow_html=True)
 
         # Social Login Buttons (Placeholders)
         # We use columns to create a grid layout for the buttons
         sc1, sc2 = st.columns(2)
         
         with sc1:
-            if st.button("🇬 Google", use_container_width=True):
-                st.toast("Google login coming soon! (Requires OAuth config)", icon="🚧")
-            if st.button("📸 Instagram", use_container_width=True):
-                st.toast("Instagram login coming soon! (Requires OAuth config)", icon="🚧")
+            if st.button("🔍 Google", use_container_width=True):
+                st.toast("Google login coming soon!")
+            if st.button("📷 Instagram", use_container_width=True):
+                st.toast("Instagram login coming soon!")
                 
         with sc2:
-            if st.button("facebook Facebook", use_container_width=True): # using text as streamlit doesn't have fb icon
-                st.toast("Facebook login coming soon! (Requires OAuth config)", icon="🚧")
+            if st.button("📘 Facebook", use_container_width=True):
+                st.toast("Facebook login coming soon!")
             if st.button("💼 LinkedIn", use_container_width=True):
-                st.toast("LinkedIn login coming soon! (Requires OAuth config)", icon="🚧")
+                st.toast("LinkedIn login coming soon!")
 
 def reset_conversation():
     """Reset the conversation history."""
@@ -190,7 +241,7 @@ def render_top_bar():
                     st.session_state.view_mode = "chat"
                     st.rerun()
                 st.markdown("---")
-                if st.button("🔒 Logout", use_container_width=True):
+                if st.button("🚪 Logout", use_container_width=True):
                     st.session_state.authenticated = False
                     st.session_state.current_user = None
                     st.session_state.current_user_fullname = None
@@ -202,14 +253,14 @@ def render_profile():
     display_name = st.session_state.get("current_user_fullname") or st.session_state.current_user
     st.markdown(f"""
         <div class="sticky-header">
-            <h1>👤 {display_name}</h1>
+            <h1><span style="color: #667eea; margin-right: 8px;">👤</span>{display_name}</h1>
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown(f"### Welcome, {display_name}!")
+    st.markdown(f'<h3>👋 Welcome, {display_name}!</h3>', unsafe_allow_html=True)
     
     st.markdown("---")
-    st.subheader("Saved Database Configurations")
+    st.markdown('<h3>💾 Saved Database Configurations</h3>', unsafe_allow_html=True)
     
     if not st.session_state.saved_connections:
         st.info("No saved connections yet. Connect to a database in the sidebar to save one.")
@@ -219,10 +270,10 @@ def render_profile():
         connection_to_delete = None
         
         for name, config in st.session_state.saved_connections.items():
-            with st.expander(f"🔌 {name}"):
+            with st.expander(f"🗄️ {name}"):
                 with st.form(key=f"edit_form_{name}"):
                     # Type Selection
-                    db_type_options = ["MySQL 🐬", "PostgreSQL 🐘", "SQL Server 🏢", "SQLite 🗄️", "Snowflake ❄️", "Databricks 🧱"]
+                    db_type_options = ["MySQL", "PostgreSQL", "SQL Server", "SQLite", "Snowflake", "Databricks"]
                     current_index = 0
                     if config.get('TYPE') in db_type_options:
                         current_index = db_type_options.index(config.get('TYPE'))
@@ -252,7 +303,7 @@ def render_profile():
                         new_http = st.text_input("HTTP Path", value=new_http, key=f"http_{name}")
                         new_catalog = st.text_input("Catalog", value=new_catalog, key=f"cat_{name}")
 
-                    if st.form_submit_button("💾 Save Changes"):
+                    if st.form_submit_button("Save Changes"):
                         # Update config
                         updated_config = config.copy()
                         updated_config.update({
@@ -274,7 +325,7 @@ def render_profile():
                         st.success("Settings updated!")
                         st.rerun()
 
-                if st.button("🗑️ Delete Connection", key=f"del_{name}"):
+                if st.button("Delete Connection", key=f"del_{name}"):
                     connection_to_delete = name
 
         if connection_to_delete:
@@ -286,7 +337,7 @@ def render_profile():
             st.rerun()
     
     st.markdown("---")
-    if st.button("Back to Chat"):
+    if st.button("← Back to Chat"):
         st.session_state.view_mode = "chat"
         st.rerun()
 
@@ -294,18 +345,18 @@ def render_sidebar():
     """Render the sidebar configuration."""
     with st.sidebar:
         # Theme Toggle
-        st.markdown("### ⚙️ Appearance")
+        st.markdown('<p class="sidebar-section-title">⚙️ Appearance</p>', unsafe_allow_html=True)
         dark_mode = st.toggle("Dark Mode", value=st.session_state.dark_mode, key="dark_mode_toggle")
         if dark_mode != st.session_state.dark_mode:
             st.session_state.dark_mode = dark_mode
             st.rerun()
 
         st.markdown("---")
-        st.header("🔌 Connect Database")
+        st.markdown('<p class="sidebar-section-title">🗄️ Connect Database</p>', unsafe_allow_html=True)
         
         # Load Saved Connections
         saved_names = ["New Connection"] + list(st.session_state.saved_connections.keys())
-        selected_conn = st.selectbox("📂 Load Saved Connection", saved_names)
+        selected_conn = st.selectbox("Load Saved Connection", saved_names)
         
         if selected_conn != "New Connection":
             # If we just switched to this connection, load it into db_config
@@ -320,28 +371,28 @@ def render_sidebar():
                  # Optional: Reset config? For now, let's keep current values to allow "Save As" behavior
         
         st.markdown("Configure your connection below to start analyzing data.")
-        st.subheader("Connection Details", divider="blue")
+        st.markdown('<p class="sidebar-subheading">Connection Details</p>', unsafe_allow_html=True)
         
         # Connection Name Input
         conn_name_val = selected_conn if selected_conn != "New Connection" else "My Connection"
         connection_name = st.text_input("Connection Name (for saving)", value=conn_name_val)
 
         # Database Type Selection
-        db_type_options = ["MySQL 🐬", "PostgreSQL 🐘", "SQL Server 🏢", "SQLite 🗄️", "Snowflake ❄️", "Databricks 🧱"]
+        db_type_options = ["MySQL", "PostgreSQL", "SQL Server", "SQLite", "Snowflake", "Databricks"]
         current_type_index = 0
         if st.session_state.db_config['TYPE'] in db_type_options:
             current_type_index = db_type_options.index(st.session_state.db_config['TYPE'])
             
-        db_type = st.radio("Database Type", db_type_options, index=current_type_index, horizontal=True)
+        db_type = st.selectbox("Database Type", db_type_options, index=current_type_index)
 
         # Handle Type Change & Default Ports
         if db_type != st.session_state.db_config['TYPE']:
             st.session_state.db_config['TYPE'] = db_type
             defaults = {
-                "PostgreSQL 🐘": '5432',
-                "SQL Server 🏢": '1433',
-                "MySQL 🐬": '3306',
-                "Databricks 🧱": '443'
+                "PostgreSQL": '5432',
+                "SQL Server": '1433',
+                "MySQL": '3306',
+                "Databricks": '443'
             }
             if db_type in defaults:
                 st.session_state.db_config['PORT'] = defaults[db_type]
@@ -372,19 +423,19 @@ def render_sidebar():
             config['PORT'] = st.text_input("Port", value=config['PORT'], placeholder="3306/5432/1433")
 
         # Connect Button
-        button_label = "🚀 Connect & Save" if not st.session_state.db_connected else "🔄 Update Connection"
+        button_label = "Connect & Save" if not st.session_state.db_connected else "Update Connection"
         if st.button(button_label):
             with st.spinner("Testing connection..."):
                 ok, db_list = test_connection(config)
                 if ok:
                     st.session_state.db_connected = True
                     st.session_state.databases = db_list
-                    st.success("✅ Connected successfully!")
+                    st.success("Connected successfully!")
                     
                     # Save connection to session state
                     if connection_name:
                         st.session_state.saved_connections[connection_name] = config.copy()
-                        st.toast(f"Connection '{connection_name}' saved!", icon="💾")
+                        st.toast(f"Connection '{connection_name}' saved!")
                     
                     # Auto-save to profile if user is logged in
                     if st.session_state.current_user:
@@ -411,7 +462,7 @@ def render_sidebar():
             current_db = st.session_state.db_config['DATABASE']
             index = db_options.index(current_db) if current_db in db_options else 0
             
-            selected_db = st.selectbox("📂 Select Database", options=db_options, index=index)
+            selected_db = st.selectbox("Select Database", options=db_options, index=index)
             
             if selected_db != st.session_state.db_config['DATABASE']:
                 st.session_state.db_config['DATABASE'] = selected_db
@@ -427,7 +478,7 @@ def render_sidebar():
                     if current_schema not in schemas:
                         current_schema = schemas[0]
                     
-                    selected_schema = st.selectbox("📂 Select Schema", options=schemas, index=schemas.index(current_schema))
+                    selected_schema = st.selectbox("Select Schema", options=schemas, index=schemas.index(current_schema))
                     st.session_state.db_config['SCHEMA'] = selected_schema
                 else:
                     st.session_state.db_config['SCHEMA'] = 'PUBLIC'
@@ -447,25 +498,25 @@ def render_sidebar():
                     st.error(f"Agent Initialization Failed: {e}")
 
         st.markdown("---")
-        if st.button("🗑️ Reset Conversation"):
+        if st.button("🔄 Reset Conversation"):
             reset_conversation()
             st.rerun()
 
 def render_chat():
     """Render the main chat interface."""
-    # Sticky Header
+    # Sticky Header with gradient title
     st.markdown("""
         <div class="sticky-header">
-            <h1>Vortex 🌀</h1>
+            <h1><span style="color: #667eea; margin-right: 8px;">◈</span>Vortex</h1>
         </div>
     """, unsafe_allow_html=True)
     
-    # Welcome Banner
+    # Welcome Banner with modern styling
     st.markdown("""
     <div class="welcome-banner">
-        <h3>Welcome to Vortex!</h3>
-        <p>Vortex transforms your natural language questions into SQL queries and Python visualizations. 
-        Connect your database in the sidebar to get started.</p>
+        <h3>✨ Welcome to Vortex</h3>
+        <p>Transform your natural language questions into powerful SQL queries and beautiful Python visualizations. 
+        Connect your database using the sidebar to get started.</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -481,7 +532,7 @@ def render_chat():
     # Chat History
     for message in st.session_state.messages:
         role = message["role"]
-        avatar = "🚀" if role == "user" else "❇️"
+        avatar = "🚀" if role == "user" else "✨"
         with st.chat_message(role, avatar=avatar):
             if role == "assistant":
                 display_text_with_images(message["content"])
@@ -500,7 +551,7 @@ def render_chat():
         with st.chat_message("user", avatar="🚀"):
             st.markdown(prompt)
 
-        with st.chat_message("assistant", avatar="❇️"):
+        with st.chat_message("assistant", avatar="✨"):
             if not st.session_state.db_connected or not st.session_state.sql_agent:
                 response = "Please configure and connect to a database using the sidebar before running queries."
                 st.markdown(response)
@@ -513,7 +564,7 @@ def render_chat():
                         # Chain of Agents: SQL Agent (Get Data) -> Python Agent (Visualize)
                         
                         # Step 1: Fetch Data
-                        st.markdown("##### 🔍 Fetching data...")
+                        st.markdown('<h5>🔍 Fetching data...</h5>', unsafe_allow_html=True)
                         fetch_prompt = (
                             f"Please fetch the data required to answer this request: '{prompt}'. "
                             "Do not generate any plots or images yourself. "
@@ -528,7 +579,7 @@ def render_chat():
                             {"callbacks": [StreamlitCallbackHandler(st.container())]}
                         )
                         data_context = sql_response['output']
-                        st.markdown("##### ✅ Data fetched!")
+                        st.markdown('<h5 style="color: #22c55e;">✅ Data fetched!</h5>', unsafe_allow_html=True)
 
                         # Step 2: Visualize Data
                         visualize_prompt = (
