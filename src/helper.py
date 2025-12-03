@@ -13,7 +13,7 @@ def display_code_plots(text):
         # Replace fig.show() with Streamlit's display method to render inline
         if "fig.show()" in code:
             # Inject template based on current theme if possible, or just default to a good one
-            if st.session_state.get('dark_mode', True):
+            if st.session_state.get('dark_mode', False):
                 theme_code = "fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')"
             else:
                 theme_code = "fig.update_layout(template='plotly_white', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')"
@@ -70,38 +70,40 @@ def display_text_with_images(text):
 def inject_custom_css(is_dark_mode):
     if is_dark_mode:
         colors = {
-            "bg_app": "#18181B",      # Zinc 950 (Softer black)
-            "bg_sidebar": "#27272A",  # Zinc 800
-            "text": "#FAFAFA",        # Zinc 50
-            "card_bg": "#27272A",
-            "card_border": "#3F3F46", # Zinc 700
-            "input_bg": "#3F3F46",
-            "input_border": "#52525B",# Zinc 600
-            "input_text": "#FAFAFA",
-            "primary": "#3B82F6",     # Solid Blue 500
-            "button_text": "#FFFFFF"
+            "bg_app": "#09090b",      # Zinc 950
+            "bg_sidebar": "#18181b",  # Zinc 900
+            "text": "#fafafa",        # Zinc 50
+            "card_bg": "#18181b",
+            "card_border": "#27272a", # Zinc 800
+            "input_bg": "#27272a",
+            "input_border": "#3f3f46",# Zinc 700
+            "input_text": "#fafafa",
+            "primary": "#60a5fa",     # Blue 400
+            "button_text": "#ffffff",
+            "secondary_bg": "#18181b"
         }
     else:
         colors = {
-            "bg_app": "#FFFFFF",
-            "bg_sidebar": "#F4F4F5",  # Zinc 100
-            "text": "#18181B",        # Zinc 900
-            "card_bg": "#FFFFFF",
-            "card_border": "#E4E4E7", # Zinc 200
-            "input_bg": "#FFFFFF",
-            "input_border": "#D4D4D8",# Zinc 300
-            "input_text": "#18181B",
-            "primary": "#2563EB",     # Solid Blue 600
-            "button_text": "#FFFFFF"
+            "bg_app": "#fafafa",      # Zinc 50
+            "bg_sidebar": "#ffffff",  # White
+            "text": "#3f3f46",        # Zinc 700
+            "card_bg": "#ffffff",
+            "card_border": "#eeeef0", # Zinc 200
+            "input_bg": "#ffffff",
+            "input_border": "#eeeef0",
+            "input_text": "#3f3f46",
+            "primary": "#60a5fa",     # Blue 400
+            "button_text": "#ffffff",
+            "secondary_bg": "#ffffff"
         }
 
     st.markdown(f"""
     <style>
-        /* Import Google Font */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        /* Global Font Settings - Import Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
         html, body, [class*="css"] {{
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', 'Source Sans Pro', sans-serif;
             color: {colors['text']};
         }}
         
@@ -110,16 +112,17 @@ def inject_custom_css(is_dark_mode):
             background-color: {colors['bg_app']};
         }}
         
-        /* Title - Solid Color, No Gradient */
-        h1 {{
+        /* Title */
+        h1, h2, h3 {{
             color: {colors['text']};
-            font-weight: 800;
-            padding-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            padding-bottom: 0.5rem;
         }}
         
         /* Card-like styling for chat messages */
         .stChatMessage {{
-            background-color: {colors['card_bg']};
+            background-color: {colors['secondary_bg']};
             border: 1px solid {colors['card_border']};
             border-radius: 12px;
             padding: 15px;
@@ -137,35 +140,61 @@ def inject_custom_css(is_dark_mode):
             padding-top: 1rem;
         }}
         
-        /* Custom Button - Solid Color */
+        /* Custom Button - Outline Style */
         div.stButton > button {{
-            background-color: {colors['primary']};
-            color: {colors['button_text']};
-            border: none;
+            background-color: {colors['bg_app']};
+            color: {colors['text']};
+            border: 1px solid {colors['input_border']};
             border-radius: 8px;
-            padding: 0.6rem 1.2rem;
-            font-weight: 600;
+            padding: 0.5rem 1rem;
+            font-weight: 500;
             transition: all 0.2s ease;
-            width: 100%;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            opacity: 0.9;
         }}
         
         div.stButton > button:hover {{
-            opacity: 0.9;
+            border-color: {colors['primary']};
+            color: {colors['primary']};
+            background-color: {colors['secondary_bg']};
             transform: translateY(-1px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            opacity: 1;
+        }}
+        
+        /* Primary Button Override */
+        div.stButton > button[kind="primary"] {{
+            background-color: {colors['primary']};
+            color: {colors['button_text']};
+            border: none;
+        }}
+        
+        /* Popover Button Styling */
+        [data-testid="stPopover"] button {{
+            background-color: {colors['bg_app']};
+            color: {colors['text']};
+            border: 1px solid {colors['input_border']};
+            border-radius: 8px;
+            font-weight: 500;
+            opacity: 0.9;
+        }}
+        
+        [data-testid="stPopover"] button:hover {{
+            border-color: {colors['primary']};
+            color: {colors['primary']};
+            opacity: 1;
         }}
         
         /* Input fields */
-        .stTextInput input {{
+        .stTextInput input, .stSelectbox div[data-baseweb="select"] > div {{
             border-radius: 8px;
             border: 1px solid {colors['input_border']};
             background-color: {colors['input_bg']};
             color: {colors['input_text']};
         }}
         
-        .stTextInput input:focus {{
+        .stTextInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within {{
             border-color: {colors['primary']};
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 0 0 2px {colors['primary']}33; /* 20% opacity hex */
         }}
         
         /* Text color overrides */
@@ -175,7 +204,7 @@ def inject_custom_css(is_dark_mode):
         
         /* Welcome Banner */
         .welcome-banner {{
-            background-color: {colors['card_bg']};
+            background-color: {colors['secondary_bg']};
             border: 1px solid {colors['card_border']};
             border-left: 5px solid {colors['primary']};
             padding: 20px;
@@ -190,7 +219,7 @@ def inject_custom_css(is_dark_mode):
             border: 1px solid {colors['input_border']} !important;
         }}
         
-        /* Fix for the bottom container background to match app background */
+        /* Fix for the bottom container background */
         [data-testid="stBottom"], footer, header {{
             background-color: {colors['bg_app']} !important;
         }}
@@ -204,25 +233,16 @@ def inject_custom_css(is_dark_mode):
             background-color: {colors['bg_app']} !important;
         }}
         
-        .stApp {{
-            background-color: {colors['bg_app']};
-        }}
-        
-        /* Chat Input Container */
-        .stChatInput {{
-            background-color: {colors['bg_app']} !important;
-        }}
-        
         /* Alerts */
         .stAlert {{
-            background-color: {colors['card_bg']};
-            border: 1px solid {colors['card_border']};
+            background-color: {colors['secondary_bg']};
             color: {colors['text']};
+            border: 1px solid {colors['card_border']};
         }}
         
         /* Code blocks */
         code, pre {{
-            background-color: {colors['input_bg']} !important;
+            background-color: {colors['secondary_bg']} !important;
             color: {colors['text']} !important;
             border-radius: 6px;
         }}
@@ -234,7 +254,7 @@ def inject_custom_css(is_dark_mode):
         
         /* Tool output (expanders) styling to look like code */
         [data-testid="stExpanderDetails"] {{
-            background-color: {colors['input_bg']};
+            background-color: {colors['secondary_bg']};
             border-radius: 8px;
             padding: 10px;
         }}

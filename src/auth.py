@@ -19,19 +19,35 @@ def load_users():
     except:
         return {}
 
-def save_user(username, password):
+def save_user(username, password, first_name="", last_name=""):
     """Save a new user to the JSON file."""
     users = load_users()
     if username in users:
         return False, "User already exists"
     
     users[username] = {
-        "password": hash_password(password)
+        "password": hash_password(password),
+        "first_name": first_name,
+        "last_name": last_name
     }
     
     with open(USERS_FILE, "w") as f:
         json.dump(users, f)
     return True, "User created successfully"
+
+def get_user_info(username):
+    """Get user details."""
+    users = load_users()
+    if username in users:
+        return {
+            "first_name": users[username].get("first_name", ""),
+            "last_name": users[username].get("last_name", "")
+        }
+    # Check if it's admin
+    if username == st.secrets.get("auth", {}).get("username", "admin"):
+        return {"first_name": "Admin", "last_name": "User"}
+        
+    return {"first_name": "", "last_name": ""}
 
 def verify_user(username, password):
     """Verify user credentials."""
@@ -49,3 +65,30 @@ def verify_user(username, password):
             return True
             
     return False
+
+def update_user_settings(username, settings):
+    """Update settings for a specific user."""
+    users = load_users()
+    if username not in users:
+        # If it's the admin user or a secrets user, we can't save to json easily unless we create an entry
+        # For now, let's only support saving for users in the json file or create a placeholder
+        if username == st.secrets.get("auth", {}).get("username", "admin"):
+             # Create a special entry for admin settings if not exists
+             if username not in users:
+                 users[username] = {"password": ""} # Dummy password for admin in file
+    
+    if "settings" not in users[username]:
+        users[username]["settings"] = {}
+        
+    users[username]["settings"].update(settings)
+    
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f)
+    return True
+
+def get_user_settings(username):
+    """Get settings for a specific user."""
+    users = load_users()
+    if username in users:
+        return users[username].get("settings", {})
+    return {}

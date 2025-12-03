@@ -8,7 +8,7 @@ import warnings
 from llm_agent import initialize_sql_agent, initialize_python_agent
 from helper import display_code_plots, display_text_with_images, inject_custom_css
 from database import test_connection, get_snowflake_schemas
-from auth import verify_user, save_user
+from auth import verify_user, save_user, update_user_settings, get_user_settings, get_user_info
 
 # Suppress warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="databricks.sql")
@@ -41,9 +41,17 @@ def init_session_state():
     if "databases" not in st.session_state:
         st.session_state.databases = []
     if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = True
+        st.session_state.dark_mode = False
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
+    if "current_user" not in st.session_state:
+        st.session_state.current_user = None
+    if "current_user_fullname" not in st.session_state:
+        st.session_state.current_user_fullname = None
+    if "view_mode" not in st.session_state:
+        st.session_state.view_mode = "chat" # chat or profile
+    if "saved_connections" not in st.session_state:
+        st.session_state.saved_connections = {}
     
     # Agent Memory
     if "agent_memory_sql" not in st.session_state:
@@ -77,12 +85,35 @@ def login_page():
                 if submit:
                     if verify_user(username, password):
                         st.session_state.authenticated = True
+                        st.session_state.current_user = username
+                        
+                        # Get full name
+                        user_info = get_user_info(username)
+                        full_name = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+                        if not full_name:
+                            full_name = username
+                        st.session_state.current_user_fullname = full_name
+                        
+                        # Load user settings
+                        settings = get_user_settings(username)
+                        if "saved_connections" in settings:
+                            st.session_state.saved_connections = settings["saved_connections"]
+                        # Backward compatibility: check for single db_config and migrate it
+                        elif "db_config" in settings:
+                            st.session_state.saved_connections = {"Default": settings["db_config"]}
+                            
                         st.rerun()
                     else:
                         st.error("Invalid username or password")
         
         with tab2:
             with st.form("signup_form"):
+                col_s1, col_s2 = st.columns(2)
+                with col_s1:
+                    first_name = st.text_input("First Name")
+                with col_s2:
+                    last_name = st.text_input("Last Name")
+                    
                 new_user = st.text_input("New Username")
                 new_pass = st.text_input("New Password", type="password")
                 confirm_pass = st.text_input("Confirm Password", type="password")
@@ -94,7 +125,7 @@ def login_page():
                     elif not new_user or not new_pass:
                         st.error("Username and password are required")
                     else:
-                        success, msg = save_user(new_user, new_pass)
+                        success, msg = save_user(new_user, new_pass, first_name, last_name)
                         if success:
                             st.success(msg)
                             st.info("Please switch to the Login tab to log in.")
@@ -143,6 +174,122 @@ def reset_conversation():
         except Exception as e:
             st.error(f"Error re-initializing agents: {e}")
 
+def render_top_bar():
+    """Render the top navigation bar."""
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        pass # Spacer
+    with col2:
+        if st.session_state.authenticated:
+            display_name = st.session_state.get("current_user_fullname") or st.session_state.current_user
+            with st.popover(f"👤 {display_name}"):
+                if st.button("👤 Profile", use_container_width=True):
+                    st.session_state.view_mode = "profile"
+                    st.rerun()
+                if st.button("💬 Chat", use_container_width=True):
+                    st.session_state.view_mode = "chat"
+                    st.rerun()
+                st.markdown("---")
+                if st.button("🔒 Logout", use_container_width=True):
+                    st.session_state.authenticated = False
+                    st.session_state.current_user = None
+                    st.session_state.current_user_fullname = None
+                    st.session_state.view_mode = "chat"
+                    st.rerun()
+
+def render_profile():
+    """Render the user profile page."""
+    display_name = st.session_state.get("current_user_fullname") or st.session_state.current_user
+    st.markdown(f"""
+        <div class="sticky-header">
+            <h1>👤 {display_name}</h1>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"### Welcome, {display_name}!")
+    
+    st.markdown("---")
+    st.subheader("Saved Database Configurations")
+    
+    if not st.session_state.saved_connections:
+        st.info("No saved connections yet. Connect to a database in the sidebar to save one.")
+    else:
+
+        # Use a list to track deletions to avoid modifying dict during iteration
+        connection_to_delete = None
+        
+        for name, config in st.session_state.saved_connections.items():
+            with st.expander(f"🔌 {name}"):
+                with st.form(key=f"edit_form_{name}"):
+                    # Type Selection
+                    db_type_options = ["MySQL 🐬", "PostgreSQL 🐘", "SQL Server 🏢", "SQLite 🗄️", "Snowflake ❄️", "Databricks 🧱"]
+                    current_index = 0
+                    if config.get('TYPE') in db_type_options:
+                        current_index = db_type_options.index(config.get('TYPE'))
+                    
+                    new_type = st.selectbox("Database Type", db_type_options, index=current_index, key=f"type_{name}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_host = st.text_input("Host", value=config.get('HOST', ''), key=f"host_{name}")
+                        new_port = st.text_input("Port", value=config.get('PORT', ''), key=f"port_{name}")
+                        new_user = st.text_input("User", value=config.get('USER', ''), key=f"user_{name}")
+                    with col2:
+                        new_db = st.text_input("Database / Path", value=config.get('DATABASE', ''), key=f"db_{name}")
+                        new_schema = st.text_input("Schema", value=config.get('SCHEMA', ''), key=f"schema_{name}")
+                        new_pass = st.text_input("Password", value=config.get('PASSWORD', ''), type="password", key=f"pass_{name}")
+                    
+                    # Initialize advanced vars
+                    new_warehouse = config.get('WAREHOUSE', '')
+                    new_role = config.get('ROLE', '')
+                    new_http = config.get('HTTP_PATH', '')
+                    new_catalog = config.get('CATALOG', '')
+
+                    # Advanced Settings
+                    if st.checkbox("Show Advanced Settings (Snowflake/Databricks)", key=f"adv_{name}"):
+                        new_warehouse = st.text_input("Warehouse", value=new_warehouse, key=f"wh_{name}")
+                        new_role = st.text_input("Role", value=new_role, key=f"role_{name}")
+                        new_http = st.text_input("HTTP Path", value=new_http, key=f"http_{name}")
+                        new_catalog = st.text_input("Catalog", value=new_catalog, key=f"cat_{name}")
+
+                    if st.form_submit_button("💾 Save Changes"):
+                        # Update config
+                        updated_config = config.copy()
+                        updated_config.update({
+                            'TYPE': new_type,
+                            'HOST': new_host,
+                            'PORT': new_port,
+                            'USER': new_user,
+                            'DATABASE': new_db,
+                            'SCHEMA': new_schema,
+                            'PASSWORD': new_pass,
+                            'WAREHOUSE': new_warehouse,
+                            'ROLE': new_role,
+                            'HTTP_PATH': new_http,
+                            'CATALOG': new_catalog
+                        })
+                        st.session_state.saved_connections[name] = updated_config
+                        if st.session_state.current_user:
+                            update_user_settings(st.session_state.current_user, {"saved_connections": st.session_state.saved_connections})
+                        st.success("Settings updated!")
+                        st.rerun()
+
+                if st.button("🗑️ Delete Connection", key=f"del_{name}"):
+                    connection_to_delete = name
+
+        if connection_to_delete:
+            del st.session_state.saved_connections[connection_to_delete]
+            # Update persistent storage
+            if st.session_state.current_user:
+                update_user_settings(st.session_state.current_user, {"saved_connections": st.session_state.saved_connections})
+            st.success(f"Deleted connection: {connection_to_delete}")
+            st.rerun()
+    
+    st.markdown("---")
+    if st.button("Back to Chat"):
+        st.session_state.view_mode = "chat"
+        st.rerun()
+
 def render_sidebar():
     """Render the sidebar configuration."""
     with st.sidebar:
@@ -152,15 +299,32 @@ def render_sidebar():
         if dark_mode != st.session_state.dark_mode:
             st.session_state.dark_mode = dark_mode
             st.rerun()
-            
-        if st.button("🔒 Logout"):
-            st.session_state.authenticated = False
-            st.rerun()
 
         st.markdown("---")
         st.header("🔌 Connect Database")
+        
+        # Load Saved Connections
+        saved_names = ["New Connection"] + list(st.session_state.saved_connections.keys())
+        selected_conn = st.selectbox("📂 Load Saved Connection", saved_names)
+        
+        if selected_conn != "New Connection":
+            # If we just switched to this connection, load it into db_config
+            # We use a session state variable to track the last loaded connection to avoid constant reloading
+            if st.session_state.get("last_loaded_conn") != selected_conn:
+                st.session_state.db_config = st.session_state.saved_connections[selected_conn].copy()
+                st.session_state.last_loaded_conn = selected_conn
+                st.rerun()
+        else:
+            if st.session_state.get("last_loaded_conn") != "New Connection":
+                 st.session_state.last_loaded_conn = "New Connection"
+                 # Optional: Reset config? For now, let's keep current values to allow "Save As" behavior
+        
         st.markdown("Configure your connection below to start analyzing data.")
         st.subheader("Connection Details", divider="blue")
+        
+        # Connection Name Input
+        conn_name_val = selected_conn if selected_conn != "New Connection" else "My Connection"
+        connection_name = st.text_input("Connection Name (for saving)", value=conn_name_val)
 
         # Database Type Selection
         db_type_options = ["MySQL 🐬", "PostgreSQL 🐘", "SQL Server 🏢", "SQLite 🗄️", "Snowflake ❄️", "Databricks 🧱"]
@@ -216,6 +380,15 @@ def render_sidebar():
                     st.session_state.db_connected = True
                     st.session_state.databases = db_list
                     st.success("✅ Connected successfully!")
+                    
+                    # Save connection to session state
+                    if connection_name:
+                        st.session_state.saved_connections[connection_name] = config.copy()
+                        st.toast(f"Connection '{connection_name}' saved!", icon="💾")
+                    
+                    # Auto-save to profile if user is logged in
+                    if st.session_state.current_user:
+                        update_user_settings(st.session_state.current_user, {"saved_connections": st.session_state.saved_connections})
                     
                     # Initialize agents immediately for SQLite or if no DB selection needed
                     if "SQLite" in db_type:
@@ -402,7 +575,11 @@ def main():
         login_page()
     else:
         render_sidebar()
-        render_chat()
+        render_top_bar()
+        if st.session_state.view_mode == "profile":
+            render_profile()
+        else:
+            render_chat()
 
 if __name__ == "__main__":
     main()
